@@ -6,8 +6,7 @@
   become: true
   tags: grafana
 
-- name: Set privileges on provisioned dashboards
-  become: true
+- name: set privileges on provisioned dashboards
   file:
     path: "{{ grafana_data_dir }}/dashboards"
     recurse: true
@@ -15,19 +14,29 @@
     group: grafana
     mode: 0640
   listen: "provisioned dashboards changed"
-
-- name: Set privileges on provisioned dashboards directory
   become: true
+  tags: grafana
+
+- name: set privileges on provisioned dashboards directory
   file:
     path: "{{ grafana_data_dir }}/dashboards"
     state: directory
     recurse: false
     mode: 0755
   listen: "provisioned dashboards changed"
-
-- name: reload consul
-  systemd:
-    name: consul
-    state: reloaded
   become: true
   tags: grafana
+
+- name: reload ufw
+  systemd:
+    name: ufw
+    state: reloaded
+  tags: loki
+  become: true
+
+- name: reload firewalld
+  systemd:
+    name: firewalld
+    state: reloaded
+  tags: loki
+  become: true

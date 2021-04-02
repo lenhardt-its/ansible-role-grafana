@@ -2,6 +2,7 @@
 - become: false
   delegate_to: localhost
   run_once: true
+  tags: grafana
   block:
     - name: Create local grafana dashboard directory
       tempfile:
@@ -9,27 +10,17 @@
       register: _tmp_dashboards
       changed_when: false
       check_mode: false
+      tags: grafana
 
     # Use curl to solve issue #77
     - name: download grafana dashboard from grafana.net to local directory
       command: >
-        curl --fail --compressed {{ url }} -o {{ _tmp_dashboards.path }}/{{ filename }}
+        curl --fail --compressed
+        https://grafana.com/api/dashboards/{{ item.dashboard_id }}/revisions/{{ item.revision_id }}/download
+        -o {{ _tmp_dashboards.path }}/{{ item.dashboard_id }}.json
       args:
-        creates: "{{ _tmp_dashboards.path }}/{{ filename }}"
+        creates: "{{ _tmp_dashboards.path }}/{{ item.dashboard_id }}.json"
         warn: false
-      vars:
-        source: "{{ 'url' if 'url' in item else 'grafana' }}"
-        filename: >-
-          {%- if source == "url" -%}
-          {{ item.url | urlsplit('path') | basename }}
-          {%- else -%}
-          {{ item.dashboard_id }}.json
-          {%- endif -%}
-        url: >-
-          {%- if source == "url" -%}{{ item.url }}{%- else -%}
-          https://grafana.com/api/dashboards/{{ item.dashboard_id }}/revisions/{{ item.revision_id }}/download
-          {%- endif -%}
-      environment: "{{proxy_env}}"
       register: _download_dashboards
       until: _download_dashboards is succeeded
       retries: 5
@@ -40,6 +31,7 @@
       check_mode: false
       tags:
         - skip_ansible_lint
+        - grafana
 
     # As noted in [1] an exported dashboard replaces the exporter's datasource
     # name with a representative name, something like 'DS_GRAPHITE'. The name
@@ -75,20 +67,13 @@
 
     - name: Set the correct data source name in the dashboard
       replace:
-        dest: "{{ _tmp_dashboards.path }}/{{ filename }}"
+        dest: "{{ _tmp_dashboards.path }}/{{ item.dashboard_id }}.json"
         regexp: '"(?:\${)?DS_[A-Z0-9_-]+(?:})?"'
         replace: '"{{ item.datasource }}"'
-      vars:
-        source: "{{ 'url' if 'url' in item else 'grafana' }}"
-        filename: >-
-          {%- if source == "url" -%}
-          {{ item.url | urlsplit('path') | basename }}
-          {%- else -%}
-          {{ item.dashboard_id }}.json
-          {%- endif -%}
       changed_when: false
       with_items: "{{ grafana_dashboards }}"
       when: grafana_dashboards | length > 0
+      tags: grafana
 
 - name: Import grafana dashboards through API
   uri:
@@ -109,6 +94,7 @@
     - "{{ _tmp_dashboards.path }}/*"
     - "{{ grafana_dashboards_dir }}/*.json"
   when: not grafana_use_provisioning
+  tags: grafana
 
 # TODO: uncomment this when ansible 2.7 will be min supported version
 # - name: import grafana dashboards
@@ -144,6 +130,7 @@
         group: grafana
         mode: 0640
       notify: restart grafana
+      tags: grafana
 
     - name: Register previously copied dashboards
       find:
@@ -153,6 +140,7 @@
           - "*.json"
       register: _dashboards_present
       when: grafana_provisioning_synced
+      tags: grafana
 
     - name: Import grafana dashboards
       become: true
@@ -164,17 +152,20 @@
         - "{{ grafana_dashboards_dir }}/*.json"
       register: _dashboards_copied
       notify: "provisioned dashboards changed"
+      tags: grafana
 
     - name: Get dashboard lists
       set_fact:
         _dashboards_present_list: "{{ _dashboards_present | json_query('files[*].path') | default([]) }}"
         _dashboards_copied_list: "{{ _dashboards_copied | json_query('results[*].dest') | default([]) }}"
       when: grafana_provisioning_synced
+      tags: grafana
 
-    - name: Remove dashbards not present on deployer machine (synchronize)
+    - name: Remove dashboards not present on deployer machine (synchronize)
       become: true
       file:
         path: "{{ item }}"
         state: absent
       with_items: "{{ _dashboards_present_list | difference( _dashboards_copied_list ) }}"
       when: grafana_provisioning_synced
+    tags: grafana

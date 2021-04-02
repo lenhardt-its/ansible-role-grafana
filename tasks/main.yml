@@ -13,6 +13,7 @@
     - grafana_datasources
     - grafana_notifications
     - grafana_dashboards
+    - grafana
 
 - include: preflight.yml
   tags:
@@ -21,21 +22,25 @@
     - grafana_datasources
     - grafana_notifications
     - grafana_dashboards
+    - grafana
 
 - include: install.yml
   become: true
   tags:
     - grafana_install
+    - grafana
 
 - include: configure.yml
   become: true
   tags:
     - grafana_configure
+    - grafana
 
 - include: plugins.yml
   when: grafana_plugins != []
   tags:
     - grafana_configure
+    - grafana
 
 - name: Restart grafana before configuring datasources and dashboards
   meta: flush_handlers
@@ -46,6 +51,7 @@
     - grafana_notifications
     - grafana_dashboards
     - grafana_run
+    - grafana
 
 - name: Wait for grafana to start (http/s)
   wait_for:
@@ -59,6 +65,7 @@
     - grafana_notifications
     - grafana_dashboards
     - grafana_run
+    - grafana
 
 - name: Wait for grafana to start (socket)
   wait_for:
@@ -71,12 +78,14 @@
     - grafana_notifications
     - grafana_dashboards
     - grafana_run
+    - grafana
 
 - include: api_keys.yml
   when: grafana_api_keys | length > 0
   tags:
     - grafana_configure
     - grafana_run
+    - grafana
 
 - include: datasources.yml
   when: grafana_datasources != []
@@ -84,6 +93,7 @@
     - grafana_configure
     - grafana_datasources
     - grafana_run
+    - grafana
 
 - include: notifications.yml
   when: grafana_alert_notifications | length > 0
@@ -91,23 +101,22 @@
     - grafana_configure
     - grafana_notifications
     - grafana_run
+    - grafana
 
-- name: "Check if there are any dashboards in {{ grafana_dashboards_dir }}"
+- name: "Check if there are any dashboards in local {{ grafana_dashboards_dir }}"
   become: false
-  find:
-    paths: "{{ grafana_dashboards_dir }}"
-    patterns: '*.json'
-  delegate_to: localhost
-  run_once: true
-  register: found_dashboards
+  set_fact:
+    found_dashboards: "{{ lookup('fileglob', grafana_dashboards_dir + '/*.json', wantlist=True) }}"
   tags:
     - grafana_configure
     - grafana_dashboards
     - grafana_run
+    - grafana
 
 - include: dashboards.yml
-  when: grafana_dashboards | length > 0 or found_dashboards.matched > 0
+  when: grafana_dashboards | length > 0 or found_dashboards | length > 0
   tags:
     - grafana_configure
     - grafana_dashboards
     - grafana_run
+    - grafana

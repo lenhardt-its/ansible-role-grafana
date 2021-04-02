@@ -5,6 +5,7 @@
     recurse: false
     paths: "{{ grafana_data_dir }}/plugins"
   register: installed_plugins
+  tags: grafana
 
 - name: Install plugins
   become: true
@@ -18,3 +19,4 @@
   delay: 2
   notify:
     - restart grafana
+  tags: grafana
