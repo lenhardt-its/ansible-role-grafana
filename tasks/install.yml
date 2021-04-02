@@ -1,6 +1,5 @@
 ---
 - block:
-  tags: grafana
     - name: Update apt cache
       apt:
         update_cache: true
