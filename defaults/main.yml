@@ -96,6 +96,7 @@ grafana_auth: {}
 #  basic:
 #    enabled: true
 
+
 grafana_ldap: {}
 #  verbose_logging: false
 #  servers:
